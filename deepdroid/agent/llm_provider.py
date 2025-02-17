@@ -9,10 +9,22 @@ import os
 import aiohttp
 import asyncio
 import logging
+import time
 from dataclasses import dataclass
 from enum import Enum
 
 logger = logging.getLogger(__name__)
+
+# HTTP status codes that should trigger a retry
+RETRY_STATUS_CODES = {
+    429,  # Too Many Requests
+    500,  # Internal Server Error
+    502,  # Bad Gateway
+    503,  # Service Unavailable
+    504,  # Gateway Timeout
+    520,  # Cloudflare: Unknown Error
+    524,  # Cloudflare: A Timeout Occurred
+}
 
 class MessageRole(Enum):
     """Enum for message roles in the conversation"""
@@ -64,6 +76,18 @@ def parse_chat_response(response_data: Dict[str, Any], original_messages: List[M
         messages=updated_messages
     )
 
+class LLMProviderError(Exception):
+    """Base class for LLM provider errors"""
+    pass
+
+class RetryableError(LLMProviderError):
+    """Error that can be retried"""
+    pass
+
+class NonRetryableError(LLMProviderError):
+    """Error that should not be retried"""
+    pass
+
 class LLMProvider(ABC):
     """Abstract base class for LLM providers"""
     
@@ -85,6 +109,54 @@ class LLMProvider(ABC):
         """
         pass
 
+    async def _make_request(self,
+                          url: str,
+                          headers: Dict[str, str],
+                          data: Dict[str, Any],
+                          timeout: int,
+                          max_retries: int,
+                          retry_delay: int) -> Dict[str, Any]:
+        """Make an HTTP request with retries"""
+        attempt = 0
+        last_error = None
+        
+        while attempt < max_retries:
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.post(
+                        url,
+                        headers=headers,
+                        json=data,
+                        timeout=timeout
+                    ) as response:
+                        if response.status == 200:
+                            return await response.json()
+                        
+                        error_text = await response.text()
+                        if response.status in RETRY_STATUS_CODES:
+                            raise RetryableError(f"HTTP {response.status}: {error_text}")
+                        else:
+                            raise NonRetryableError(f"HTTP {response.status}: {error_text}")
+                            
+            except asyncio.TimeoutError:
+                last_error = RetryableError(f"Request timed out after {timeout} seconds")
+            except aiohttp.ClientError as e:
+                last_error = RetryableError(f"Network error: {str(e)}")
+            except RetryableError as e:
+                last_error = e
+            except Exception as e:
+                if isinstance(e, NonRetryableError):
+                    raise
+                last_error = RetryableError(f"Unexpected error: {str(e)}")
+            
+            attempt += 1
+            if attempt < max_retries:
+                delay = retry_delay * (1.5 ** (attempt - 1))  # Exponential backoff
+                logger.warning(f"Attempt {attempt} failed: {str(last_error)}. Retrying in {delay:.1f}s...")
+                await asyncio.sleep(delay)
+            
+        raise last_error or RetryableError("Max retries exceeded")
+
 class OpenRouterProvider(LLMProvider):
     """OpenRouter LLM provider implementation"""
     
@@ -96,6 +168,8 @@ class OpenRouterProvider(LLMProvider):
         
         self.model = config['default_model']
         self.timeout = config['timeout']
+        self.max_retries = config.get('max_retries', 3)
+        self.retry_delay = config.get('retry_delay', 1)
     
     async def generate(self,
                       messages: List[Message],
@@ -117,24 +191,19 @@ class OpenRouterProvider(LLMProvider):
             data['max_tokens'] = max_tokens
             
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    f"{self.base_url}/chat/completions",
-                    headers=headers,
-                    json=data,
-                    timeout=self.timeout
-                ) as response:
-                    if response.status != 200:
-                        error_text = await response.text()
-                        raise Exception(f"OpenRouter API error: {error_text}")
-                    
-                    result = await response.json()
-                    return parse_chat_response(result, messages)
-                    
-        except asyncio.TimeoutError:
-            raise Exception(f"OpenRouter API timeout after {self.timeout} seconds")
+            result = await self._make_request(
+                url=f"{self.base_url}/chat/completions",
+                headers=headers,
+                data=data,
+                timeout=self.timeout,
+                max_retries=self.max_retries,
+                retry_delay=self.retry_delay
+            )
+            return parse_chat_response(result, messages)
+            
         except Exception as e:
-            raise Exception(f"OpenRouter API error: {str(e)}")
+            logger.error(f"OpenRouter API error: {str(e)}")
+            raise
 
 class OpenAIProvider(LLMProvider):
     """OpenAI LLM provider implementation"""
@@ -147,6 +216,8 @@ class OpenAIProvider(LLMProvider):
         
         self.model = config['default_model']
         self.timeout = config['timeout']
+        self.max_retries = config.get('max_retries', 3)
+        self.retry_delay = config.get('retry_delay', 1)
     
     async def generate(self,
                       messages: List[Message],
@@ -167,24 +238,19 @@ class OpenAIProvider(LLMProvider):
             data['max_tokens'] = max_tokens
             
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    f"{self.base_url}/chat/completions",
-                    headers=headers,
-                    json=data,
-                    timeout=self.timeout
-                ) as response:
-                    if response.status != 200:
-                        error_text = await response.text()
-                        raise Exception(f"OpenAI API error: {error_text}")
-                    
-                    result = await response.json()
-                    return parse_chat_response(result, messages)
-                    
-        except asyncio.TimeoutError:
-            raise Exception(f"OpenAI API timeout after {self.timeout} seconds")
+            result = await self._make_request(
+                url=f"{self.base_url}/chat/completions",
+                headers=headers,
+                data=data,
+                timeout=self.timeout,
+                max_retries=self.max_retries,
+                retry_delay=self.retry_delay
+            )
+            return parse_chat_response(result, messages)
+            
         except Exception as e:
-            raise Exception(f"OpenAI API error: {str(e)}")
+            logger.error(f"OpenAI API error: {str(e)}")
+            raise
 
 class LLMProviderFactory:
     """Factory for creating LLM providers"""
