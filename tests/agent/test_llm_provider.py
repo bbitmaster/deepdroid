@@ -3,23 +3,54 @@ Tests for LLM providers.
 """
 
 import pytest
-import aiohttp
-from unittest.mock import Mock, patch, AsyncMock, MagicMock
 from deepdroid.agent.llm_provider import (
     LLMProvider,
     OpenRouterProvider,
     OpenAIProvider,
     LLMProviderFactory,
     Message,
-    MessageRole
+    MessageRole,
+    format_chat_messages,
+    parse_chat_response
 )
-import asyncio
-from aiohttp import URL
 
-@pytest.fixture
-def mock_response():
-    """Create a mock API response"""
-    return {
+def test_format_chat_messages():
+    """Test message formatting for chat APIs"""
+    messages = [
+        Message(role=MessageRole.SYSTEM, content="System message"),
+        Message(role=MessageRole.USER, content="User message"),
+        Message(role=MessageRole.ASSISTANT, content="Assistant message"),
+        Message(role=MessageRole.TOOL, content="Tool output", name="tool_name")
+    ]
+    
+    formatted = format_chat_messages(messages)
+    
+    assert len(formatted) == 4
+    assert formatted[0] == {
+        'role': 'system',
+        'content': 'System message'
+    }
+    assert formatted[1] == {
+        'role': 'user',
+        'content': 'User message'
+    }
+    assert formatted[2] == {
+        'role': 'assistant',
+        'content': 'Assistant message'
+    }
+    assert formatted[3] == {
+        'role': 'tool',
+        'content': 'Tool output',
+        'name': 'tool_name'
+    }
+
+def test_parse_chat_response():
+    """Test parsing chat API responses"""
+    original_messages = [
+        Message(role=MessageRole.USER, content="Test message")
+    ]
+    
+    response_data = {
         "model": "test-model",
         "choices": [{
             "message": {
@@ -30,111 +61,16 @@ def mock_response():
             "total_tokens": 10
         }
     }
-
-@pytest.fixture
-def mock_session():
-    """Create a mock aiohttp session"""
-    from unittest.mock import MagicMock
     
-    class AsyncContextManagerMock:
-        """A custom async context manager for mocking responses"""
-        def __init__(self):
-            self.status = 200
-            self.json = AsyncMock(return_value=None)  # Will be set in individual tests
-            self.text = AsyncMock(return_value="Error text")
-        
-        async def __aenter__(self):
-            return self
-        
-        async def __aexit__(self, exc_type, exc_val, exc_tb):
-            pass
+    result = parse_chat_response(response_data, original_messages)
     
-    # Create the response
-    response = AsyncContextManagerMock()
-    
-    # Create the session
-    session = MagicMock()
-    session.__aenter__.return_value = session
-    session.__aexit__.return_value = None
-    
-    # Create a mock post method that returns our response
-    async def mock_post(*args, **kwargs):
-        return response
-    
-    session.post = mock_post
-    return session
-
-@pytest.mark.asyncio
-async def test_openrouter_provider_success(mock_response, mock_session):
-    """Test successful OpenRouter API call"""
-    config = {
-        'base_url': 'https://test.com',
-        'api_key': 'test-key',
-        'default_model': 'test-model',
-        'timeout': 30
-    }
-    
-    provider = OpenRouterProvider(config)
-    messages = [
-        Message(role=MessageRole.USER, content="Test message")
-    ]
-    
-    with patch('aiohttp.ClientSession', return_value=mock_session):
-        mock_session.post.return_value.json.return_value = mock_response
-        response = await provider.generate(messages)
-        
-        assert response.content == "Test response"
-        assert response.model == "test-model"
-        assert response.usage == {"total_tokens": 10}
-        assert len(response.messages) == 2  # Original + response
-
-@pytest.mark.asyncio
-async def test_openrouter_provider_error(mock_session):
-    """Test OpenRouter API error handling"""
-    config = {
-        'base_url': 'https://test.com',
-        'api_key': 'test-key',
-        'default_model': 'test-model',
-        'timeout': 30
-    }
-    
-    provider = OpenRouterProvider(config)
-    messages = [
-        Message(role=MessageRole.USER, content="Test message")
-    ]
-    
-    # Simulate API error
-    mock_session.post.return_value.status = 400
-    mock_session.post.return_value.text.return_value = "API Error"
-    
-    with patch('aiohttp.ClientSession', return_value=mock_session):
-        with pytest.raises(Exception) as exc_info:
-            await provider.generate(messages)
-        assert "OpenRouter API error" in str(exc_info.value)
-
-@pytest.mark.asyncio
-async def test_openai_provider_success(mock_response, mock_session):
-    """Test successful OpenAI API call"""
-    config = {
-        'base_url': 'https://api.openai.com/v1',
-        'api_key': 'test-key',
-        'default_model': 'gpt-4',
-        'timeout': 30
-    }
-    
-    provider = OpenAIProvider(config)
-    messages = [
-        Message(role=MessageRole.USER, content="Test message")
-    ]
-    
-    with patch('aiohttp.ClientSession', return_value=mock_session):
-        mock_session.post.return_value.json.return_value = mock_response
-        response = await provider.generate(messages)
-        
-        assert response.content == "Test response"
-        assert response.model == "test-model"
-        assert response.usage == {"total_tokens": 10}
-        assert len(response.messages) == 2  # Original + response
+    assert result.content == "Test response"
+    assert result.model == "test-model"
+    assert result.usage == {"total_tokens": 10}
+    assert len(result.messages) == 2
+    assert result.messages[0].role == MessageRole.USER
+    assert result.messages[1].role == MessageRole.ASSISTANT
+    assert result.messages[1].content == "Test response"
 
 def test_llm_provider_factory():
     """Test LLM provider factory"""

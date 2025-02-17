@@ -37,6 +37,33 @@ class LLMResponse:
     raw_response: Dict[str, Any]
     messages: List[Message]  # Full conversation history
 
+def format_chat_messages(messages: List[Message]) -> List[Dict[str, Any]]:
+    """Format messages into the standard chat API format"""
+    return [
+        {
+            'role': msg.role.value,
+            'content': msg.content,
+            **({"name": msg.name} if msg.name else {})
+        }
+        for msg in messages
+    ]
+
+def parse_chat_response(response_data: Dict[str, Any], original_messages: List[Message]) -> LLMResponse:
+    """Parse a chat API response into a standardized format"""
+    new_message = Message(
+        role=MessageRole.ASSISTANT,
+        content=response_data['choices'][0]['message']['content']
+    )
+    updated_messages = original_messages + [new_message]
+    
+    return LLMResponse(
+        content=new_message.content,
+        model=response_data['model'],
+        usage=response_data['usage'],
+        raw_response=response_data,
+        messages=updated_messages
+    )
+
 class LLMProvider(ABC):
     """Abstract base class for LLM providers"""
     
@@ -81,19 +108,9 @@ class OpenRouterProvider(LLMProvider):
             'HTTP-Referer': 'https://github.com/yourusername/deepdroid',  # Replace with your repo
         }
         
-        # Convert our Message objects to the format expected by OpenRouter
-        api_messages = [
-            {
-                'role': msg.role.value,
-                'content': msg.content,
-                **({"name": msg.name} if msg.name else {})
-            }
-            for msg in messages
-        ]
-        
         data = {
             'model': self.model,
-            'messages': api_messages,
+            'messages': format_chat_messages(messages),
             'temperature': temperature,
         }
         if max_tokens:
@@ -112,21 +129,7 @@ class OpenRouterProvider(LLMProvider):
                         raise Exception(f"OpenRouter API error: {error_text}")
                     
                     result = await response.json()
-                    
-                    # Add the assistant's response to the message history
-                    new_message = Message(
-                        role=MessageRole.ASSISTANT,
-                        content=result['choices'][0]['message']['content']
-                    )
-                    updated_messages = messages + [new_message]
-                    
-                    return LLMResponse(
-                        content=new_message.content,
-                        model=result['model'],
-                        usage=result['usage'],
-                        raw_response=result,
-                        messages=updated_messages
-                    )
+                    return parse_chat_response(result, messages)
                     
         except asyncio.TimeoutError:
             raise Exception(f"OpenRouter API timeout after {self.timeout} seconds")
@@ -155,19 +158,9 @@ class OpenAIProvider(LLMProvider):
             'Content-Type': 'application/json',
         }
         
-        # Convert our Message objects to the format expected by OpenAI
-        api_messages = [
-            {
-                'role': msg.role.value,
-                'content': msg.content,
-                **({"name": msg.name} if msg.name else {})
-            }
-            for msg in messages
-        ]
-        
         data = {
             'model': self.model,
-            'messages': api_messages,
+            'messages': format_chat_messages(messages),
             'temperature': temperature,
         }
         if max_tokens:
@@ -186,21 +179,7 @@ class OpenAIProvider(LLMProvider):
                         raise Exception(f"OpenAI API error: {error_text}")
                     
                     result = await response.json()
-                    
-                    # Add the assistant's response to the message history
-                    new_message = Message(
-                        role=MessageRole.ASSISTANT,
-                        content=result['choices'][0]['message']['content']
-                    )
-                    updated_messages = messages + [new_message]
-                    
-                    return LLMResponse(
-                        content=new_message.content,
-                        model=result['model'],
-                        usage=result['usage'],
-                        raw_response=result,
-                        messages=updated_messages
-                    )
+                    return parse_chat_response(result, messages)
                     
         except asyncio.TimeoutError:
             raise Exception(f"OpenAI API timeout after {self.timeout} seconds")

@@ -8,7 +8,8 @@ setup(
         "aiohttp>=3.9.1",
         "pyyaml>=6.0.1",
         "python-dotenv>=1.0.0",
-        "typing-extensions>=4.8.0"
+        "typing-extensions>=4.8.0",
+        "click>=8.1.0"
     ],
     extras_require={
         "dev": [
@@ -22,7 +23,7 @@ setup(
     },
     entry_points={
         "console_scripts": [
-            "deepdroid=deepdroid.__main__:main",
+            "deepdroid=deepdroid.cli:cli",
         ]
     },
     author="Your Name",
