@@ -1,0 +1,26 @@
+llm:
+  provider: openrouter  # default provider
+  openrouter:
+    base_url: https://openrouter.ai/api/v1
+    api_key: ""  # to be loaded from environment variable OPENROUTER_API_KEY
+    default_model: anthropic/claude-3-sonnet  # default model to use
+    timeout: 30  # request timeout in seconds
+    
+  # Support for other providers can be added here
+  openai:
+    base_url: https://api.openai.com/v1
+    api_key: ""  # to be loaded from environment variable OPENAI_API_KEY
+    default_model: gpt-4-turbo
+    timeout: 30
+
+agent:
+  max_retries: 3  # maximum number of retries for failed LLM calls
+  retry_delay: 1  # delay between retries in seconds
+  memory_file: "agent_memory.txt"  # path to store agent memory
+  system_prompt_dir: "system_prompts"  # directory containing system prompts
+  log_level: "INFO"  # logging level (DEBUG, INFO, WARNING, ERROR)
+  conversation:
+    max_turns: 10  # maximum number of conversation turns before reset
+    max_chars: 32000  # maximum total characters in conversation history
+    include_tool_outputs: true  # whether to include tool outputs in conversation history
+    summarize_on_reset: true  # whether to summarize conversation when resetting 
