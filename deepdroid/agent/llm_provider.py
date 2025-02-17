@@ -62,19 +62,31 @@ def format_chat_messages(messages: List[Message]) -> List[Dict[str, Any]]:
 
 def parse_chat_response(response_data: Dict[str, Any], original_messages: List[Message]) -> LLMResponse:
     """Parse a chat API response into a standardized format"""
-    new_message = Message(
-        role=MessageRole.ASSISTANT,
-        content=response_data['choices'][0]['message']['content']
-    )
-    updated_messages = original_messages + [new_message]
-    
-    return LLMResponse(
-        content=new_message.content,
-        model=response_data['model'],
-        usage=response_data['usage'],
-        raw_response=response_data,
-        messages=updated_messages
-    )
+    try:
+        if 'choices' not in response_data:
+            logger.error(f"Unexpected API response format: {response_data}")
+            raise LLMProviderError(f"Unexpected API response format: missing 'choices' field")
+        
+        if not response_data['choices'] or 'message' not in response_data['choices'][0]:
+            logger.error(f"Invalid response format: {response_data}")
+            raise LLMProviderError("Invalid response format: no message in choices")
+        
+        new_message = Message(
+            role=MessageRole.ASSISTANT,
+            content=response_data['choices'][0]['message']['content']
+        )
+        updated_messages = original_messages + [new_message]
+        
+        return LLMResponse(
+            content=new_message.content,
+            model=response_data.get('model', 'unknown'),
+            usage=response_data.get('usage', {}),
+            raw_response=response_data,
+            messages=updated_messages
+        )
+    except KeyError as e:
+        logger.error(f"Failed to parse API response: {response_data}")
+        raise LLMProviderError(f"Failed to parse API response: {str(e)}")
 
 class LLMProviderError(Exception):
     """Base class for LLM provider errors"""
@@ -191,6 +203,7 @@ class OpenRouterProvider(LLMProvider):
             data['max_tokens'] = max_tokens
             
         try:
+            logger.debug(f"Sending request to OpenRouter API: {data}")
             result = await self._make_request(
                 url=f"{self.base_url}/chat/completions",
                 headers=headers,
@@ -199,6 +212,7 @@ class OpenRouterProvider(LLMProvider):
                 max_retries=self.max_retries,
                 retry_delay=self.retry_delay
             )
+            logger.debug(f"Received response from OpenRouter API: {result}")
             return parse_chat_response(result, messages)
             
         except Exception as e:

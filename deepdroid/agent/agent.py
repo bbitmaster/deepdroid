@@ -4,6 +4,7 @@ Main agent implementation that coordinates the parser, config manager, and LLM p
 
 import asyncio
 import logging
+import os
 from typing import Optional, Type, Dict, Any, List
 from deepdroid.parser import Parser
 from deepdroid.agent.config import ConfigManager

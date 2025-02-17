@@ -55,17 +55,15 @@ async def run_improvement_loop(agent: Agent,
                 system_prompt_name="codebase_improver"
             )
             
-            # Parse the result and get feedback
-            feedback = parser.parse(result)
-            
-            # Use the feedback as the next message
-            if not feedback.strip():
-                logger.info("No feedback received, ending improvement loop")
+            # Check if we got any output
+            if not result or not result.strip():
+                logger.info("No output received, ending improvement loop")
                 break
                 
+            # Use the result as the next message
             current_message = (
                 "Previous actions have been completed. Here is the output:\n\n"
-                f"{feedback}\n\n"
+                f"{result}\n\n"
                 "Please analyze this output and determine the next improvements to make."
             )
             

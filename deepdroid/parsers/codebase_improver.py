@@ -11,6 +11,7 @@ from typing import List, Dict, Optional
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 import logging
+from deepdroid.agent.config import ConfigManager
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -35,6 +36,19 @@ class CodebaseImproverParser(Parser):
         self.memories: List[MemoryEntry] = []
         self.system_prompt: Optional[str] = None
         self._load_memories()
+        self._load_system_prompt()
+    
+    def _load_system_prompt(self) -> None:
+        """Load the codebase improver system prompt"""
+        try:
+            config = ConfigManager()
+            system_prompt_dir = config.agent_config['system_prompt_dir']
+            prompt_path = os.path.join(system_prompt_dir, "codebase_improver.txt")
+            with open(prompt_path, 'r') as f:
+                self.set_system_prompt(f.read())
+        except Exception as e:
+            logger.error(f"Error loading system prompt: {str(e)}")
+            raise
     
     def _load_memories(self) -> None:
         """Load memories from persistent storage if it exists"""

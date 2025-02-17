@@ -12,6 +12,7 @@ if [ ! "$(docker ps -q -f name=$CONTAINER_NAME)" ]; then
     # Run new container
     docker run -it -d \
         --name $CONTAINER_NAME \
+        --network host \
         -v $(pwd)/workspace:/app/workspace \
         deepdroid:latest
 fi

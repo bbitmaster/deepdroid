@@ -4,7 +4,7 @@ llm:
     base_url: https://openrouter.ai/api/v1
     api_key: ""  # to be loaded from environment variable OPENROUTER_API_KEY
     default_model: anthropic/claude-3-sonnet  # default model to use
-    timeout: 5  # shorter request timeout in seconds
+    timeout: 60  # timeout in seconds for longer responses
     max_retries: 5  # maximum number of retries per request
     retry_delay: 1  # delay between retries in seconds
     
@@ -13,16 +13,16 @@ llm:
     base_url: https://api.openai.com/v1
     api_key: ""  # to be loaded from environment variable OPENAI_API_KEY
     default_model: gpt-4-turbo
-    timeout: 5
+    timeout: 60
     max_retries: 5
     retry_delay: 1
 
 agent:
   max_retries: 3  # maximum number of retries for failed LLM calls
   retry_delay: 1  # delay between retries in seconds
-  memory_file: "agent_memory.txt"  # path to store agent memory
-  system_prompt_dir: "system_prompts"  # directory containing system prompts
-  log_level: "INFO"  # logging level (DEBUG, INFO, WARNING, ERROR)
+  memory_file: "/app/data/agent_memory.txt"  # path to store agent memory
+  system_prompt_dir: "/app/deepdroid/system_prompts"  # directory containing system prompts
+  log_level: "DEBUG"  # logging level (DEBUG, INFO, WARNING, ERROR)
   conversation:
     max_turns: 10  # maximum number of conversation turns before reset
     max_chars: 32000  # maximum total characters in conversation history
