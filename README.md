@@ -2,6 +2,38 @@
 
 DeepDroid is a minimal framework for building LLM-powered agents that can iteratively solve tasks. It's designed to be simple, extensible, and run in a containerized environment for safety.
 
+## What is DeepDroid?
+
+DeepDroid represents a new paradigm in AI development - the concept of autonomous AI agents. The name "DeepDroid" is a playful nod to both the era when everything in machine learning was prefixed with "deep" and the word "droid" which evokes the idea of an autonomous AI agent. While the terminology in this space is still evolving, the core concept is powerful: giving AI systems a degree of autonomy through well-defined contracts and capabilities.
+
+At its heart, DeepDroid allows you to create AI agents that can:
+- Make decisions autonomously within defined boundaries
+- Execute real actions through code and system commands
+- Maintain memory and context across sessions
+- Iteratively solve complex tasks
+- Interact with and improve codebases
+
+## Why DeepDroid?
+
+The field of AI is rapidly evolving, and we're entering an era where Large Language Models (LLMs) are becoming capable enough to handle complex, multi-step tasks with remarkable reliability. This creates an opportunity for a new kind of software architecture - one where AI agents can be given:
+
+1. **A Mission**: A high-level objective or task to accomplish
+2. **A Contract**: A well-defined set of capabilities and constraints
+3. **Tools**: The ability to execute code, run commands, and interact with systems
+4. **Memory**: Persistent storage to maintain context and learning across sessions
+
+DeepDroid provides a minimal framework for building these kinds of agents. As LLM capabilities improve and inference costs decrease, frameworks like this will become increasingly powerful, potentially enabling:
+- Automated codebase improvements and maintenance
+- Complex system administration tasks
+- Autonomous research and experimentation
+- Collaborative problem-solving between multiple agents
+
+The framework is intentionally minimal, providing only the core components needed:
+- A system prompt that defines the agent's behavior and capabilities
+- A parser that executes the agent's decisions
+- A task runner that coordinates the interaction loop
+- Persistent memory for maintaining context
+
 ## Author
 
 **Ben Goodrich (with AI assistance)**  
